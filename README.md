@@ -9,16 +9,21 @@ of them were collected, moderated, approved in moderation, tagged and released t
 splitting by media channel.
 
 ```sql
+with table1 as (
+select aa.id, aa.acquisition_at, aa.media_channel
+from asset_acquisition aa
+)
 select
-	aa.media_channel,
-	sum(case when af.from_state = 'COLLECTED' then 1 else 0 end) as collected,
+	ta.media_channel,
+	count(ta.id) as collected2,
+	--sum(case when af.from_state = 'COLLECTED' then 1 else 0 end) as collected,
 	sum(case when af.to_state = 'APPROVED IN MODERATION' or af.to_state = 'REJECTED IN MODERATION' then 1 else 0 end) as moderated,
 	sum(case when af.to_state = 'APPROVED IN MODERATION' then 1 else 0 end) as approved_in_mod,
 	sum(case when af.to_state = 'TAGGED' then 1 else 0 end) as tagged,
 	sum(case when af.to_state = 'RELEASED TO WIDGETS' then 1 else 0 end) as released_to_widgets
-from asset_flow af
-inner join asset_acquisition aa on aa.asset_id = af.asset_id
-where aa.acquisition_at > current_date - INTERVAL '30 days'
+from table1 ta
+left join asset_flow af on ta.id = af.id
+where ta.acquisition_at > current_date - INTERVAL '30 days'
 group by 1;
 ```
 
@@ -98,6 +103,22 @@ Disclaimer:
  - This approach would work for a batch mode, for a streaming mode would be different
  - It will mainly rely on a streaming solution that keeps updating each media_channel, with no time slice.
 ```
+
+silver
+id, media channel, state, acquisition_at, status_date, date_slice
+1, instagram, collected, 01/01/2020, 02/01/2020, 10
+
+date_slice|media_channel|collected|moderated|approved_in_mod|tagged|released_to_widgets|
+----------+-------------+---------+---------+---------------+------+-------------------+
+15 days   |instagram    |       10|        9|              6|     6|                  5|
+
+select 
+	date,
+	media_channel,
+	sum(case when media_channel = 'COLLECTED' then 1 else 0) end as collected
+from table1
+where date = current_date
+group by 1
 
 ## Question #6
 The funnel is just one use case that has been identified as a bottleneck. How would you identify
